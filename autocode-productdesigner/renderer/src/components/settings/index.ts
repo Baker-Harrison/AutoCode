@@ -1,0 +1,9 @@
+export { SettingsPanel } from './SettingsPanel';
+export { SettingsDialog } from './SettingsDialog';
+export { GeneralSettings } from './GeneralSettings';
+export { EditorSettings } from './EditorSettings';
+export { TerminalSettings } from './TerminalSettings';
+export { GitSettings } from './GitSettings';
+export { ExtensionsSettings } from './ExtensionsSettings';
+export { AboutSettings } from './AboutSettings';
+export { KeyboardShortcutSettings } from './KeyboardShortcutSettings';

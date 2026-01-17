@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --zed-bg: #282c33;
+  --zed-panel: #2f343e;
+  --zed-surface: #3b414d;
+  --zed-element: #2e343e;
+  --zed-element-hover: #363c46;
+  --zed-element-active: #454a56;
+  --zed-element-selected: #454a56;
+  --zed-border: #464b57;
+  --zed-border-alt: #363c46;
+  --zed-border-focused: #47679e;
+  --zed-text: #dce0e5;
+  --zed-text-muted: #a9afbc;
+  --zed-text-placeholder: #878a98;
+  --zed-accent: #74ade8;
+  --zed-scrollbar-thumb: rgba(200, 204, 212, 0.3);
+  --zed-scrollbar-track: transparent;
+}
+
+@layer base {
+  body {
+    @apply bg-zed-bg text-zed-text font-sans;
+  }
+}
+
+* {
+  scrollbar-color: var(--zed-scrollbar-thumb) var(--zed-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--zed-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--zed-scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.cm-editor {
+  background-color: var(--zed-bg);
+  color: var(--zed-text);
+  font-family: "SF Mono", "SFMono-Regular", "JetBrains Mono", "IBM Plex Mono", monospace;
+}
+
+.cm-gutters {
+  background-color: var(--zed-bg);
+  color: var(--zed-text-muted);
+  border-right: 1px solid var(--zed-border-alt);
+}
+
+.cm-activeLine {
+  background-color: rgba(47, 52, 62, 0.75);
+}
+
+.cm-selectionBackground {
+  background-color: rgba(116, 173, 232, 0.2);
+}
+
+.cm-search-match {
+  background-color: rgba(255, 215, 0, 0.3);
+  border-bottom: 2px solid rgba(255, 215, 0, 0.5);
+}
+
+.cm-search-match-active {
+  background-color: rgba(255, 165, 0, 0.4);
+  border-bottom: 2px solid rgba(255, 165, 0, 0.6);
+}
