@@ -17,8 +17,8 @@ interface IdeApi {
   clearLogs: () => Promise<void>;
   runCommand: (payload: { command: string; cwd: string; source?: string }) => Promise<{ success: boolean; output?: string; error?: string }>;
   listTasks: (sessionId: string) => Promise<TaskItem[]>;
-  startTerminal: () => Promise<{ terminalId: string }>;
-  createTerminal: (payload: { shell?: string }) => Promise<{ terminalId: string }>;
+  startTerminal: () => Promise<{ terminalId: string; usePty: boolean; error?: string; shell?: string }>;
+  createTerminal: (payload: { shell?: string }) => Promise<{ terminalId: string; usePty: boolean; error?: string; shell?: string }>;
   listTerminals: () => Promise<{ id: string; name: string; isRunning: boolean; shell: string }[]>;
   renameTerminal: (payload: { terminalId: string; name: string }) => Promise<{ ok: boolean }>;
   killTerminal: (payload: { terminalId: string }) => Promise<{ ok: boolean }>;
@@ -26,7 +26,7 @@ interface IdeApi {
   sendTerminalInput: (payload: { terminalId: string; data: string }) => void;
   resizeTerminal: (payload: { terminalId: string; cols: number; rows: number }) => void;
   disposeTerminal: (payload: { terminalId: string }) => void;
-  onTerminalData: (callback: (data: string) => void) => () => void;
+  onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => () => void;
   gitStatus: (workspace?: string) => Promise<GitStatus>;
   gitStage: (payload: { path: string; workspace?: string }) => Promise<void>;
   gitUnstage: (payload: { path: string; workspace?: string }) => Promise<void>;

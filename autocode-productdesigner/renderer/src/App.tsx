@@ -4,7 +4,6 @@ import { EditorPanel } from "@/components/ide/EditorPanel";
 import { TerminalPanel } from "@/components/ide/TerminalPanel";
 import { PlanningPanel } from "@/components/ide/PlanningPanel";
 import { LogsPanel } from "@/components/ide/LogsPanel";
-import { GitPanel } from "@/components/ide/GitPanel";
 import { TabBar } from "@/components/ide/TabBar";
 import { QuickOpenPanel } from "@/components/ide/QuickOpenPanel";
 import { CommandPalette } from "@/components/ide/CommandPalette";
@@ -13,12 +12,13 @@ import type { FileEntry, PlanningSpec, SearchResult, TaskItem, Tab } from "@/typ
 import { Button } from "@/components/ui/button";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { ToastProvider, useToast } from "@/components/ui/toast";
-import { Settings } from "lucide-react";
+import { Settings, Folder, Search } from "lucide-react";
 
-const leftTabs = ["explorer", "search", "git"] as const;
+const leftTabs = ["explorer", "search"] as const;
 const bottomTabs = ["terminal", "logs"] as const;
 const MAX_QUERY_LENGTH = 200;
 const AUTOSAVE_DELAY = 1000;
+const SEARCH_DEBOUNCE_MS = 150;
 
 interface SavedTab {
   id: string;
@@ -39,7 +39,7 @@ const AppShell = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectingWorkspace, setSelectingWorkspace] = useState(false);
-  const [autosaveEnabled, setAutosaveEnabled] = useState(false);
+  const [autosaveEnabled, setAutosaveEnabled] = useState(true);
   const [indentation, setIndentation] = useState<2 | 4 | 8>(2);
   const [wordWrap, setWordWrap] = useState(false);
   const [quickOpenOpen, setQuickOpenOpen] = useState(false);
@@ -47,6 +47,7 @@ const AppShell = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { showToast } = useToast();
   const autosaveTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const workspaceRef = useRef<string | null>(null);
 
   workspaceRef.current = workspace;
@@ -360,6 +361,15 @@ const AppShell = () => {
     }
   }, [searchQuery, showToast]);
 
+  const runDebouncedSearch = useCallback(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      runSearch();
+    }, SEARCH_DEBOUNCE_MS);
+  }, [runSearch]);
+
   const openSearchResult = useCallback(async (result: SearchResult) => {
     const newEntry: FileEntry = {
       name: result.relativePath.split(/[\\/]/).pop() || result.relativePath,
@@ -392,6 +402,9 @@ const AppShell = () => {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const inTerminal = target?.closest(".xterm") || target?.classList.contains("xterm-helper-textarea");
+
       if (event.ctrlKey || event.metaKey) {
         if (event.key.toLowerCase() === "s" && !event.altKey && !event.shiftKey) {
           event.preventDefault();
@@ -418,14 +431,20 @@ const AppShell = () => {
             }
           }
         } else if (event.key.toLowerCase() === "p" && !event.shiftKey) {
-          event.preventDefault();
-          setQuickOpenOpen(true);
+          if (!inTerminal) {
+            event.preventDefault();
+            setQuickOpenOpen(true);
+          }
         } else if (event.key.toLowerCase() === "p" && event.shiftKey) {
-          event.preventDefault();
-          setCommandPaletteOpen(true);
+          if (!inTerminal) {
+            event.preventDefault();
+            setCommandPaletteOpen(true);
+          }
         } else if (event.key === ",") {
-          event.preventDefault();
-          setSettingsOpen(true);
+          if (!inTerminal) {
+            event.preventDefault();
+            setSettingsOpen(true);
+          }
         }
       }
       if ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "s") {
@@ -453,13 +472,7 @@ const AppShell = () => {
   return (
     <div className="flex h-screen flex-col bg-zed-bg">
       <header className="flex items-center justify-between gap-4 border-b border-zed-border bg-zed-surface px-4 py-2 text-xs">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="text-zed-text">Autocode IDE</span>
-          <span className="text-zed-text-muted">/</span>
-          <span className="truncate text-zed-text-muted">{workspace}</span>
-        </div>
         <div className="flex items-center gap-4 text-zed-text-muted">
-          <span className="truncate">{activeTab ? activeTab.file.relativePath : "No file open"}</span>
           {activeTab?.isDirty && <span className="text-amber-300">● Unsaved</span>}
           <button
             onClick={() => setSettingsOpen(true)}
@@ -478,13 +491,14 @@ const AppShell = () => {
               <button
                 key={tab}
                 onClick={() => setLeftTab(tab)}
-                className={`rounded px-2 py-1 ${
+                className={`flex items-center gap-1.5 rounded px-2 py-1 ${
                   leftTab === tab
                     ? "bg-zed-element text-zed-text"
                     : "text-zed-text-muted hover:bg-zed-element-hover"
                 }`}
               >
-                {tab}
+                {tab === "explorer" && <Folder size={14} />}
+                {tab === "search" && <Search size={14} />}
               </button>
             ))}
           </div>
@@ -497,11 +511,9 @@ const AppShell = () => {
                 <div className="flex gap-2">
                   <input
                     value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        runSearch();
-                      }
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      runDebouncedSearch();
                     }}
                     className="flex-1 rounded-md border border-zed-border bg-zed-element px-3 py-2 text-xs text-zed-text placeholder:text-zed-text-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zed-border-focused"
                     placeholder="Search files and content"
@@ -512,7 +524,9 @@ const AppShell = () => {
                 </div>
                 <div className="flex-1 space-y-2 overflow-auto">
                   {searchResults.length === 0 && !searchLoading && (
-                    <div className="text-xs text-zed-text-muted">No results yet.</div>
+                    <div className="text-xs text-zed-text-muted">
+                      {searchQuery.trim() ? "No results found." : "Type to search files and content..."}
+                    </div>
                   )}
                   {searchResults.map((result, index) => (
                     <button
@@ -529,20 +543,6 @@ const AppShell = () => {
                   ))}
                 </div>
               </div>
-            )}
-            {leftTab === "git" && (
-              <GitPanel
-                workspace={workspace}
-                onFileOpen={(path) => {
-                  const entry: FileEntry = {
-                    name: path.split(/[\\/]/).pop() || path,
-                    path: path,
-                    relativePath: path,
-                    type: "file"
-                  };
-                  openFile(entry);
-                }}
-              />
             )}
           </div>
         </aside>

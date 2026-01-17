@@ -362,8 +362,8 @@ ipcMain.handle(
     if (!mainWindow || mainWindow.isDestroyed()) {
       throw new Error("Main window is not ready");
     }
-    const terminalId = terminalManager.create(activeWorkspace, mainWindow.webContents);
-    return { terminalId };
+    const { terminalId, usePty, error, shell } = terminalManager.create(activeWorkspace, mainWindow.webContents);
+    return { terminalId, usePty, error, shell };
   })
 );
 
@@ -375,8 +375,8 @@ ipcMain.handle(
       throw new Error("Main window is not ready");
     }
     const shell = payload?.shell || "powershell.exe";
-    const terminalId = terminalManager.create(activeWorkspace, mainWindow.webContents, shell);
-    return { terminalId };
+    const { terminalId, usePty, error, shell: resolvedShell } = terminalManager.create(activeWorkspace, mainWindow.webContents, shell);
+    return { terminalId, usePty, error, shell: resolvedShell };
   })
 );
 

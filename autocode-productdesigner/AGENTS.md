@@ -1,102 +1,95 @@
 # AGENTS.md
 
-This repository currently has no code. The guidelines below provide a default
-set of conventions for agentic coding work in a Python CLI-style project. Update
-once the real codebase is restored.
+This is an Electron-based IDE application built with React, TypeScript, Vite, and Tailwind CSS.
 
 ## Build / Lint / Test Commands
 
-> These are placeholder commands. Replace with project-specific commands once
-> the codebase is restored.
-
 - **Install dependencies**
-  - `python -m pip install -e .`
-  - If using a virtualenv: `python -m venv .venv` and `./.venv/Scripts/activate`
-- **Run the app (CLI)**
-  - `python -m <package> --help`
-- **Format (if black)**
-  - `python -m black .`
-- **Lint (if ruff)**
-  - `python -m ruff check .`
-- **Type check (if mypy/pyright)**
-  - `python -m mypy .`
-- **Run all tests (pytest)**
-  - `python -m pytest`
-- **Run a single test file (pytest)**
-  - `python -m pytest tests/test_example.py`
-- **Run a single test (pytest)**
-  - `python -m pytest tests/test_example.py -k "test_name"`
-- **Run a single test class (pytest)**
-  - `python -m pytest tests/test_example.py -k "TestClassName"`
-- **Run a single test by node id (pytest)**
-  - `python -m pytest tests/test_example.py::TestClassName::test_name`
+  - `cd autocode-productdesigner && npm install`
+  - `cd autocode-productdesigner && npm run postinstall` (rebuilds node-pty native module)
+
+- **Run development server**
+  - `cd autocode-productdesigner && npm run dev` (runs Vite dev server + Electron with hot reload)
+
+- **Build for production**
+  - `cd autocode-productdesigner && npm run build` (builds Vite renderer, output in `dist/`)
+
+- **Start Electron app**
+  - `cd autocode-productdesigner && npm start` (requires build first)
+
+- **Type check**
+  - TypeScript strict mode is enabled in `tsconfig.json`. No separate typecheck script - build will fail on type errors.
+
+- **Lint**
+  - No ESLint configured. Code style follows Prettier-like conventions (enforced by editor).
+
+- **Tests**
+  - No test framework configured yet. When adding tests, use Vitest for consistency with Vite.
 
 ## Code Style Guidelines
 
 ### General Principles
 - Prefer small, focused functions with clear inputs/outputs.
-- Avoid unnecessary abstraction. Keep changes minimal and localized.
-- Use existing project patterns and naming conventions when discovered.
+- Avoid unnecessary abstraction; keep changes minimal and localized.
+- Use existing project patterns and naming conventions.
 - Keep side effects explicit and easy to follow.
-- Prefer clear, descriptive names over cleverness.
 
 ### Imports
-- Use standard library imports first, then third-party, then local imports.
-- Keep imports grouped and separated by a single blank line.
-- Prefer explicit imports over wildcard imports.
-- Avoid circular imports; refactor if needed.
+- Use absolute imports with `@/` alias (mapped to `renderer/src/*`).
+- Group imports: React imports first, then third-party, then local imports.
+- Prefer named imports: `import { useState } from "react"` not `import React from "react"`.
+- Keep a single blank line between import groups.
+- CSS imports for libraries like xterm should come before component imports.
 
 ### Formatting
-- Use 4 spaces for indentation.
-- Keep line length at or below 88-100 characters.
-- Prefer trailing commas in multiline literals for cleaner diffs.
-- Use black-compatible formatting if black is adopted.
+- Use 2 spaces for indentation (TS/JS convention in this project).
+- Use double quotes for strings.
+- Use Prettier defaults for all formatting rules.
+- Keep line length reasonable (around 100 chars).
+- Use trailing commas in multiline objects/arrays.
 
 ### Types and Annotations
-- Add type hints for public APIs and non-trivial functions.
-- Use `Optional[T]` only when `None` is a valid value.
-- Prefer concrete types (e.g., `list[str]`) over `Any`.
-- Add `TypedDict` or `dataclass` for structured data.
+- Enable strict mode in TypeScript.
+- Use explicit types for state: `useState<string[]>([])` not `useState([])`.
+- Avoid `any`; use `unknown` or specific types instead.
+- Use interfaces for object shapes, type aliases for unions/primitives.
+- Define shared types in `renderer/src/types/` directory.
 
 ### Naming Conventions
-- Modules: `snake_case.py`
-- Functions and variables: `snake_case`
-- Classes: `PascalCase`
-- Constants: `UPPER_SNAKE_CASE`
-- Private/internal helpers: prefix with `_`
+- Components: `PascalCase` for files and component functions.
+- Hooks: `camelCase` with `use` prefix.
+- Variables and functions: `camelCase`.
+- Constants: `UPPER_SNAKE_CASE` or `camelCase` for module-level constants.
+- Interfaces: `PascalCase` with descriptive names (`TerminalTab`, not `ITerminalTab`).
+
+### React Patterns
+- Use functional components with hooks.
+- Use `useCallback` for functions passed as dependencies.
+- Use `useRef` for DOM references and mutable values that don't trigger re-renders.
+- Use `forwardRef` for components that need to expose DOM refs.
+- Destructure props with type annotations.
 
 ### Error Handling
-- Prefer explicit error handling over silent failures.
-- Raise specific exceptions with clear messages.
-- Avoid bare `except:`; catch specific exception types.
+- Use `try/catch` for async operations with user feedback.
+- Show toast notifications for user-facing errors via `useToast` hook.
+- Log errors to console with descriptive messages.
 - Include context in error messages (ids, filenames, state).
 
-### Logging
-- Use structured logging when available.
-- Avoid `print` in library code; reserve for CLI entry points.
-- Keep logs concise and actionable.
+### Tailwind CSS
+- Use `zed-*` color variables from tailwind config for theme consistency.
+- Structure: `className="flex items-center gap-2 px-4 py-2 bg-zed-bg text-zed-text"`.
+- Use `cn()` utility from `@/lib/utils` for conditional classes.
+- Avoid arbitrary values; extend theme in `tailwind.config.ts` if needed.
 
-### CLI Conventions
-- Use clear, consistent option names.
-- Provide helpful `--help` strings for all commands and options.
-- Avoid breaking changes to CLI flags without documentation.
-- Validate inputs early and provide friendly errors.
+### Component Structure
+- Co-locate small components in the same file or same directory.
+- Use `class-variance-authority` (cva) for button variants (see `button.tsx`).
+- Follow pattern: imports, types/interfaces, constants, component.
 
-### Testing
-- Keep tests deterministic and independent.
-- Prefer unit tests for logic; use integration tests for I/O boundaries.
-- Name tests clearly: `test_<behavior>_<condition>`.
-- Avoid network calls in tests unless explicitly mocked.
-
-### Filesystem and I/O
-- Avoid global state where possible.
-- Keep file paths explicit and configurable.
-- Use `Pathlib` for path handling.
-
-### Documentation
-- Keep docstrings short and focused.
-- Document public functions and classes.
-- Update README or help text when behavior changes.
+### State Management
+- Use local component state with `useState` for UI state.
+- Use `useSettings` hook for app-wide settings (persisted to localStorage).
+- Use React Context if sharing state across many components.
 
 ## Cursor / Copilot Rules
 
@@ -105,6 +98,8 @@ once the real codebase is restored.
 
 ## Notes
 
-- Replace placeholder commands and guidelines once the real codebase is
-  restored.
-- If you add more rules, keep them concise and practical for agents.
+- Node.js 22.x required (specified in `package.json` engines).
+- The `renderer/src/` directory contains all React/TypeScript source code.
+- The `electron/` directory contains Electron main process code.
+- Native modules like `node-pty` require rebuilding on install via `electron-rebuild`.
+- If the integrated terminal shows `posix_spawnp failed` or `TTY read: Input/output error`, rebuild `node-pty` for Electron (e.g. `npm rebuild node-pty --runtime=electron --target=33.2.0 --dist-url=https://electronjs.org/headers`) and restart the app.
