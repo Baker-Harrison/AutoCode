@@ -65,7 +65,11 @@ const LIGHT_THEME = {
   white: "#6a737d"
 };
 
-export const TerminalPanel = () => {
+type TerminalPanelProps = {
+  readOnly?: boolean;
+};
+
+export const TerminalPanel = ({ readOnly = false }: TerminalPanelProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [terminals, setTerminals] = useState<TerminalTab[]>([]);
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
@@ -150,7 +154,7 @@ export const TerminalPanel = () => {
         allowProposedApi: true,
         macOptionIsMeta: true,
         rightClickSelectsWord: true,
-        disableStdin: false
+        disableStdin: readOnly
       });
 
       const fitAddon = new FitAddon();

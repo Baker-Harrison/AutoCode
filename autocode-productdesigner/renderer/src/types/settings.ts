@@ -1,4 +1,4 @@
-export type SettingsCategory = 'general' | 'editor' | 'extensions' | 'git' | 'terminal' | 'about';
+export type SettingsCategory = 'general' | 'editor' | 'extensions' | 'git' | 'terminal' | 'knowledge' | 'about';
 
 export type Settings = {
   general: {

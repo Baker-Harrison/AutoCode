@@ -5,5 +5,6 @@ export { EditorSettings } from './EditorSettings';
 export { TerminalSettings } from './TerminalSettings';
 export { GitSettings } from './GitSettings';
 export { ExtensionsSettings } from './ExtensionsSettings';
+export { PluginSettings } from './PluginSettings';
 export { AboutSettings } from './AboutSettings';
 export { KeyboardShortcutSettings } from './KeyboardShortcutSettings';

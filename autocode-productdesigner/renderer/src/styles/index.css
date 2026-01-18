@@ -4,22 +4,26 @@
 
 :root {
   color-scheme: dark;
-  --zed-bg: #282c33;
-  --zed-panel: #2f343e;
-  --zed-surface: #3b414d;
-  --zed-element: #2e343e;
-  --zed-element-hover: #363c46;
-  --zed-element-active: #454a56;
-  --zed-element-selected: #454a56;
-  --zed-border: #464b57;
-  --zed-border-alt: #363c46;
-  --zed-border-focused: #47679e;
-  --zed-text: #dce0e5;
-  --zed-text-muted: #a9afbc;
-  --zed-text-placeholder: #878a98;
-  --zed-accent: #74ade8;
-  --zed-scrollbar-thumb: rgba(200, 204, 212, 0.3);
+  --zed-bg: #0b0f14;
+  --zed-panel: #11161d;
+  --zed-surface: #18212b;
+  --zed-element: #1d2733;
+  --zed-element-hover: #253140;
+  --zed-element-active: #2d3b4c;
+  --zed-element-selected: #233241;
+  --zed-border: #202c3a;
+  --zed-border-alt: #1a2431;
+  --zed-border-focused: #4aa3ff;
+  --zed-text: #e6edf5;
+  --zed-text-muted: #a3b1c2;
+  --zed-text-placeholder: #6e7b8c;
+  --zed-accent: #4aa3ff;
+  --zed-scrollbar-thumb: rgba(110, 123, 140, 0.4);
   --zed-scrollbar-track: transparent;
+  --zed-bg-secondary: #141b24;
+  --zed-bg-tertiary: #1a2330;
+  --zed-bg-primary: #243247;
+  --zed-primary: #4aa3ff;
 }
 
 @layer base {

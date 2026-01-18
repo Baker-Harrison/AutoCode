@@ -4,7 +4,7 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogFooter } from "@/components/ui/dialog";
-import { GitCommit as GitCommitIcon, GitBranch as GitBranchIcon, Plus, Minus, ChevronDown, Trash2, ArrowUp, ArrowDown, Loader2, RefreshCw, GitPullRequest, Copy, Check, MoreHorizontal, Eye, FileSignature, History, FolderGit2, Download, Upload } from "lucide-react";
+import { GitCommit as GitCommitIcon, GitBranch as GitBranchIcon, Plus, Minus, ChevronDown, Trash2, ArrowUp, ArrowDown, Loader2, RefreshCw, GitPullRequest, Copy, Check, MoreHorizontal, Eye, FileSignature, History, FolderGit2, Download, Upload, GitMerge } from "lucide-react";
 import { DiffViewer } from "./DiffViewer";
 
 type GitPanelProps = {
@@ -449,7 +449,7 @@ export const GitPanel = ({ workspace, onFileOpen }: GitPanelProps) => {
                     onClick={() => { handlePull(false); setActionDropdownOpen(false); }}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-zed-text hover:bg-zed-element"
                   >
-                    <CloudPull size={12} /> Pull
+                    <Download size={12} /> Pull
                   </button>
                   <button
                     onClick={() => { handlePull(true); setActionDropdownOpen(false); }}
@@ -461,13 +461,13 @@ export const GitPanel = ({ workspace, onFileOpen }: GitPanelProps) => {
                     onClick={() => { handlePush(false); setActionDropdownOpen(false); }}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-zed-text hover:bg-zed-element"
                   >
-                    <CloudPush size={12} /> Push
+                    <Upload size={12} /> Push
                   </button>
                   <button
                     onClick={() => { handlePush(true); setActionDropdownOpen(false); }}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-zed-text hover:bg-zed-element"
                   >
-                    <CloudPush size={12} /> Push --tags
+                    <Upload size={12} /> Push --tags
                   </button>
                 </div>
               )}

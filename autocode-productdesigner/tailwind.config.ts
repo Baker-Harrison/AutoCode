@@ -21,7 +21,11 @@ export default {
           "text-placeholder": "var(--zed-text-placeholder)",
           accent: "var(--zed-accent)",
           "scrollbar-thumb": "var(--zed-scrollbar-thumb)",
-          "scrollbar-track": "var(--zed-scrollbar-track)"
+          "scrollbar-track": "var(--zed-scrollbar-track)",
+          "bg-secondary": "var(--zed-bg-secondary)",
+          "bg-tertiary": "var(--zed-bg-tertiary)",
+          "bg-primary": "var(--zed-bg-primary)",
+          primary: "var(--zed-primary)"
         }
       },
       fontFamily: {

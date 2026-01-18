@@ -5,15 +5,18 @@ import { EditorSettings } from './EditorSettings';
 import { TerminalSettings } from './TerminalSettings';
 import { GitSettings } from './GitSettings';
 import { ExtensionsSettings } from './ExtensionsSettings';
+import { PluginSettings } from './PluginSettings';
+import { KnowledgeSettings } from './KnowledgeSettings';
 import { AboutSettings } from './AboutSettings';
 import { KeyboardShortcutSettings } from './KeyboardShortcutSettings';
-import { Settings as SettingsIcon, Type, Palette, FileCode, Terminal, GitBranch, Puzzle, Info, Keyboard } from 'lucide-react';
+import { PromptSettings } from './PromptSettings';
+import { Settings as SettingsIcon, Type, Palette, FileCode, Terminal, GitBranch, Puzzle, Plug, Info, Keyboard, Database, MessageSquare } from 'lucide-react';
 
 interface SettingsPanelProps {
   onClose?: () => void;
 }
 
-type CategoryType = SettingsCategory | 'keyboard';
+type CategoryType = SettingsCategory | 'keyboard' | 'plugins' | 'prompt';
 
 const categories: { id: CategoryType; label: string; icon: typeof SettingsIcon }[] = [
   { id: 'general', label: 'General', icon: SettingsIcon },
@@ -21,6 +24,9 @@ const categories: { id: CategoryType; label: string; icon: typeof SettingsIcon }
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'git', label: 'Git', icon: GitBranch },
   { id: 'extensions', label: 'Extensions', icon: Puzzle },
+  { id: 'plugins', label: 'Plugins', icon: Plug },
+  { id: 'knowledge', label: 'Knowledge', icon: Database },
+  { id: 'prompt', label: 'Prompt', icon: MessageSquare },
   { id: 'keyboard', label: 'Shortcuts', icon: Keyboard },
   { id: 'about', label: 'About', icon: Info },
 ];
@@ -53,6 +59,9 @@ export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
         {category === 'terminal' && <TerminalSettings />}
         {category === 'git' && <GitSettings />}
         {category === 'extensions' && <ExtensionsSettings />}
+        {category === 'plugins' && <PluginSettings />}
+        {category === 'knowledge' && <KnowledgeSettings />}
+        {category === 'prompt' && <PromptSettings />}
         {category === 'about' && <AboutSettings />}
         {category === 'keyboard' && <KeyboardShortcutSettings />}
       </div>

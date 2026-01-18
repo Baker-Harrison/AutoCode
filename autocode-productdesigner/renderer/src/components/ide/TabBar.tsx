@@ -26,6 +26,7 @@ type TabBarProps = {
   onSaveTab: (tabId: string) => void;
   onSaveAll: () => void;
   onReorderTabs: (tabs: Tab[]) => void;
+  readOnly?: boolean;
 };
 
 type ContextMenuState = {
@@ -40,9 +41,10 @@ type SortableTabProps = {
   onSelect: () => void;
   onClose: () => void;
   onMouseDown: (e: React.MouseEvent) => void;
+  readOnly?: boolean;
 };
 
-const SortableTab = ({ tab, isActive, onSelect, onClose, onMouseDown }: SortableTabProps) => {
+const SortableTab = ({ tab, isActive, onSelect, onClose, onMouseDown, readOnly = false }: SortableTabProps) => {
   const {
     attributes,
     listeners,
@@ -73,9 +75,9 @@ const SortableTab = ({ tab, isActive, onSelect, onClose, onMouseDown }: Sortable
     <div
       ref={setNodeRef}
       style={style}
-      className={`group flex min-w-0 items-center gap-1.5 border-r border-zed-border-alt px-3 py-1.5 text-xs select-none cursor-pointer transition-colors ${
+      className={`group relative flex min-w-0 items-center gap-1.5 border-r border-zed-border-alt px-3 py-1.5 text-[12px] select-none cursor-pointer transition-colors ${
         isActive
-          ? "bg-zed-bg text-zed-text border-t-2 border-t-zed-accent"
+          ? "bg-zed-bg text-zed-text"
           : "text-zed-text-muted hover:bg-zed-element-hover hover:text-zed-text"
       }`}
       onClick={onSelect}
@@ -85,23 +87,26 @@ const SortableTab = ({ tab, isActive, onSelect, onClose, onMouseDown }: Sortable
         // Handle right-click in parent
       }}
     >
+      {isActive && <span className="absolute left-0 top-0 h-full w-0.5 bg-zed-accent" />}
       <span className="text-[10px] text-zed-text-muted font-medium">{getFileIcon(tab.file.name)}</span>
       <span className={`truncate max-w-32 ${tab.isDirty ? "italic text-amber-300" : ""}`}>
         {tab.file.name}
       </span>
-      <button
-        className={`ml-0.5 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-zed-element-active transition-all ${
-          isActive ? "opacity-100" : ""
-        }`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-      >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M1 1L11 11M1 11L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      </button>
+      {!readOnly && (
+        <button
+          className={`ml-0.5 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-zed-element-active transition-all ${
+            isActive ? "opacity-100" : ""
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M1 1L11 11M1 11L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 };
@@ -114,6 +119,7 @@ export const TabBar = ({
   onSaveTab,
   onSaveAll,
   onReorderTabs,
+  readOnly = false,
 }: TabBarProps) => {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -212,7 +218,7 @@ export const TabBar = ({
 
   if (tabs.length === 0) {
     return (
-      <div className="flex items-center gap-1 border-b border-zed-border bg-zed-surface px-4 py-2 text-xs text-zed-text-muted h-9">
+      <div className="flex items-center gap-1 border-b border-zed-border bg-zed-surface/95 px-4 py-2 text-[12px] text-zed-text-muted h-9">
         No files open
       </div>
     );
@@ -225,7 +231,7 @@ export const TabBar = ({
     <>
       <div
         ref={tabBarRef}
-        className="flex items-center gap-0 border-b border-zed-border bg-zed-surface overflow-x-auto scrollbar-thin scrollbar-thumb-zed-scrollbar-thumb scrollbar-track-transparent h-9"
+        className="flex items-center gap-0 border-b border-zed-border bg-zed-surface/95 overflow-x-auto scrollbar-thin scrollbar-thumb-zed-scrollbar-thumb scrollbar-track-transparent h-9"
       >
         <DndContext
           sensors={sensors}
@@ -308,7 +314,7 @@ export const TabBar = ({
         )}
 
         <div className="flex items-center gap-2 ml-auto pr-2">
-          {dirtyCount > 0 && (
+          {!readOnly && dirtyCount > 0 && (
             <button
               className="text-[10px] text-zed-text-muted hover:text-zed-text px-2 py-1 rounded hover:bg-zed-element-hover transition-colors"
               onClick={onSaveAll}

@@ -24,6 +24,7 @@ type EditorPanelProps = {
   onIndentationChange?: (value: 2 | 4 | 8) => void;
   wordWrap?: boolean;
   onWordWrapChange?: (enabled: boolean) => void;
+  readOnly?: boolean;
 };
 
 interface EditorState {
@@ -56,7 +57,8 @@ export const EditorPanel = ({
   indentation = 2,
   onIndentationChange,
   wordWrap = false,
-  onWordWrapChange
+  onWordWrapChange,
+  readOnly = false
 }: EditorPanelProps) => {
   const [showFind, setShowFind] = useState(false);
   const [replaceMode, setReplaceMode] = useState(false);
@@ -435,14 +437,14 @@ export const EditorPanel = ({
           ))}
         </div>
       )}
-      <div className="flex items-center justify-between border-b border-zed-border bg-zed-panel px-4 py-1.5 text-xs text-zed-text-muted">
+      <div className="flex items-center justify-between border-b border-zed-border bg-zed-panel/90 px-4 py-2 text-[12px] text-zed-text-muted">
         <div className="flex items-center gap-3">
-          <span className="truncate max-w-[200px] font-medium text-zed-text">{fileName}</span>
+          <span className="truncate max-w-[240px] font-semibold text-zed-text">{fileName}</span>
           {tab.isDirty && <span className="text-amber-400">●</span>}
           <select
             value={selectedLangExt}
             onChange={handleLanguageChange}
-            className="rounded bg-zed-element px-1.5 py-0.5 text-[10px] text-zed-text focus:outline-none cursor-pointer"
+            className="rounded bg-zed-element px-2 py-1 text-[11px] text-zed-text focus:outline-none cursor-pointer"
             title="Select Language"
           >
             <option value="">{languageName}</option>
@@ -456,24 +458,25 @@ export const EditorPanel = ({
             <button
               onClick={() => setShowLineNumbers(!showLineNumbers)}
               className={cn(
-                "rounded px-1.5 py-0.5 transition-colors",
+                "rounded px-2 py-1 text-[11px] transition-colors",
                 showLineNumbers ? "text-zed-text bg-zed-element" : "hover:text-zed-text hover:bg-zed-element-hover"
               )}
               title="Toggle Line Numbers"
             >
-              Ln
+              Lines
             </button>
             <button
-              className={`flex items-center gap-1 transition-colors ${
-                wordWrap ? "text-zed-text" : "hover:text-zed-text"
-              }`}
+              className={cn(
+                "rounded px-2 py-1 text-[11px] transition-colors",
+                wordWrap ? "text-zed-text bg-zed-element" : "hover:text-zed-text hover:bg-zed-element-hover"
+              )}
               onClick={() => onWordWrapChange?.(!wordWrap)}
             >
               Wrap
             </button>
             <div className="relative">
               <button
-                className="flex items-center gap-1 hover:text-zed-text transition-colors"
+                className="flex items-center gap-1 rounded px-2 py-1 text-[11px] hover:text-zed-text transition-colors"
                 onClick={() => setShowIndentationMenu(!showIndentationMenu)}
               >
                 <span>Indent: {indentation}</span>
@@ -503,7 +506,7 @@ export const EditorPanel = ({
             <select
               value={lineEnding}
               onChange={(e) => setLineEnding(e.target.value)}
-              className="rounded bg-zed-element px-1.5 py-0.5 text-[10px] text-zed-text focus:outline-none"
+              className="rounded bg-zed-element px-2 py-1 text-[11px] text-zed-text focus:outline-none"
               title="Line Endings"
             >
               <option value="LF">LF</option>
@@ -530,25 +533,26 @@ export const EditorPanel = ({
           height="100%"
           theme="dark"
           extensions={extensions}
+          editable={!readOnly}
           basicSetup={{
             lineNumbers: showLineNumbers,
             highlightActiveLineGutter: true,
             highlightSpecialChars: false,
-            history: true,
+            history: !readOnly,
             drawSelection: true,
-            dropCursor: true,
+            dropCursor: !readOnly,
             allowMultipleSelections: true,
-            indentOnInput: true,
+            indentOnInput: !readOnly,
             syntaxHighlighting: true,
             bracketMatching: true,
-            closeBrackets: true,
-            autocompletion: true,
+            closeBrackets: !readOnly,
+            autocompletion: !readOnly,
             rectangularSelection: true,
             crosshairCursor: false,
             highlightActiveLine: true,
             highlightSelectionMatches: true,
           }}
-          onChange={onTabChange}
+          onChange={!readOnly ? onTabChange : undefined}
           className="h-full"
         />
         {showFind && (

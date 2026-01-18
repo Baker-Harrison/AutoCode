@@ -28,6 +28,7 @@ import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 type FileExplorerProps = {
   workspace: string | null;
   onOpenFile: (file: FileEntry) => void;
+  readOnly?: boolean;
 };
 
 type NodeProps = {
@@ -38,6 +39,7 @@ type NodeProps = {
   onSelect: (path: string | null) => void;
   onContextMenu: (event: React.MouseEvent, entry: FileEntry) => void;
   refreshKey: number;
+  readOnly?: boolean;
 };
 
 const getFileIcon = (filename: string) => {
@@ -68,7 +70,7 @@ const getFileIcon = (filename: string) => {
   return icons[ext] || <FileText size={16} className="text-gray-400" />;
 };
 
-const FileNode = ({ entry, depth, onOpenFile, selectedPath, onSelect, onContextMenu, refreshKey }: NodeProps) => {
+const FileNode = ({ entry, depth, onOpenFile, selectedPath, onSelect, onContextMenu, refreshKey, readOnly = false }: NodeProps) => {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -133,6 +135,7 @@ const FileNode = ({ entry, depth, onOpenFile, selectedPath, onSelect, onContextM
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
+    if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
     onSelect(entry.path);
@@ -185,6 +188,7 @@ const FileNode = ({ entry, depth, onOpenFile, selectedPath, onSelect, onContextM
               onSelect={onSelect}
               onContextMenu={onContextMenu}
               refreshKey={refreshKey}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -193,7 +197,7 @@ const FileNode = ({ entry, depth, onOpenFile, selectedPath, onSelect, onContextM
   );
 };
 
-export const FileExplorer = ({ workspace, onOpenFile }: FileExplorerProps) => {
+export const FileExplorer = ({ workspace, onOpenFile, readOnly = false }: FileExplorerProps) => {
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -426,22 +430,26 @@ export const FileExplorer = ({ workspace, onOpenFile }: FileExplorerProps) => {
       <div className="flex items-center justify-between px-3 pt-3">
         <div className="text-[11px] uppercase tracking-wide text-zed-text-muted">Explorer</div>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setNewFileDialog(true)}
-            className="rounded p-1 text-zed-text-muted hover:bg-zed-element-hover hover:text-zed-text"
-            title="New File (Ctrl+N)"
-          >
-            <FilePlus size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setNewFolderDialog(true)}
-            className="rounded p-1 text-zed-text-muted hover:bg-zed-element-hover hover:text-zed-text"
-            title="New Folder (Ctrl+Shift+N)"
-          >
-            <FolderPlus size={14} />
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                type="button"
+                onClick={() => setNewFileDialog(true)}
+                className="rounded p-1 text-zed-text-muted hover:bg-zed-element-hover hover:text-zed-text"
+                title="New File (Ctrl+N)"
+              >
+                <FilePlus size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewFolderDialog(true)}
+                className="rounded p-1 text-zed-text-muted hover:bg-zed-element-hover hover:text-zed-text"
+                title="New Folder (Ctrl+Shift+N)"
+              >
+                <FolderPlus size={14} />
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => { setRefreshKey(k => k + 1); loadRoot(); }}
@@ -463,6 +471,7 @@ export const FileExplorer = ({ workspace, onOpenFile }: FileExplorerProps) => {
             onSelect={setSelectedPath}
             onContextMenu={handleContextMenu}
             refreshKey={refreshKey}
+            readOnly={readOnly}
           />
         ))}
       </div>
