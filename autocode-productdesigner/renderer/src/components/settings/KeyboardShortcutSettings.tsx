@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { keyboardShortcuts } from '@/types/settings';
+import { keyboardShortcuts } from '@autocode/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { RotateCcw, Search } from 'lucide-react';

@@ -5,20 +5,54 @@ const IGNORE_DIRS = new Set(["node_modules", ".git", "dist", "data"]);
 const MAX_FILE_SIZE = 512 * 1024;
 const MAX_RESULTS = 200;
 
-function walkDir(root, callback) {
-  const entries = fs.readdirSync(root, { withFileTypes: true });
+function isInsideRoot(root, target) {
+  const relative = path.relative(root, target);
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function walkDir(root, workspaceRoot, callback) {
+  let entries;
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch (error) {
+    return true;
+  }
+
   for (const entry of entries) {
     const fullPath = path.join(root, entry.name);
-    if (entry.isDirectory()) {
+    let stat;
+
+    try {
+      stat = fs.lstatSync(fullPath);
+    } catch (error) {
+      continue;
+    }
+
+    if (stat.isSymbolicLink()) {
+      continue;
+    }
+
+    let realPath = fullPath;
+    try {
+      realPath = fs.realpathSync(fullPath);
+    } catch (error) {
+      continue;
+    }
+
+    if (!isInsideRoot(workspaceRoot, realPath)) {
+      continue;
+    }
+
+    if (stat.isDirectory()) {
       if (IGNORE_DIRS.has(entry.name)) {
         continue;
       }
-      const shouldContinue = walkDir(fullPath, callback);
+      const shouldContinue = walkDir(realPath, workspaceRoot, callback);
       if (shouldContinue === false) {
         return false;
       }
     } else {
-      const shouldContinue = callback(fullPath);
+      const shouldContinue = callback(realPath);
       if (shouldContinue === false) {
         return false;
       }
@@ -31,24 +65,30 @@ function searchWorkspace(workspacePath, query) {
   if (!workspacePath) {
     throw new Error("Workspace not selected");
   }
-  const trimmed = query.trim();
+  const trimmed = typeof query === "string" ? query.trim() : "";
   if (!trimmed) {
     return [];
   }
 
+  const root = fs.realpathSync(workspacePath);
   const lowerQuery = trimmed.toLowerCase();
   const results = [];
 
-  walkDir(workspacePath, (filePath) => {
+  walkDir(root, root, (filePath) => {
     if (results.length >= MAX_RESULTS) {
       return false;
     }
-    const stat = fs.statSync(filePath);
-    if (stat.size > MAX_FILE_SIZE) {
+    let stat;
+    try {
+      stat = fs.statSync(filePath, { throwIfNoEntry: false });
+    } catch (error) {
+      return true;
+    }
+    if (!stat || !stat.isFile() || stat.size > MAX_FILE_SIZE) {
       return true;
     }
 
-    const relativePath = path.relative(workspacePath, filePath);
+    const relativePath = path.relative(root, filePath);
     const matchesName = path.basename(filePath).toLowerCase().includes(lowerQuery);
     let content = "";
     try {

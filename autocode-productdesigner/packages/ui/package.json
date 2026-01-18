@@ -1,0 +1,76 @@
+{
+  "name": "@autocode/ui",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./Button": {
+      "types": "./dist/Button/index.d.ts",
+      "import": "./dist/Button/index.js",
+      "require": "./dist/Button/index.js",
+      "default": "./dist/Button/index.js"
+    },
+    "./Input": {
+      "types": "./dist/Input/index.d.ts",
+      "import": "./dist/Input/index.js",
+      "require": "./dist/Input/index.js",
+      "default": "./dist/Input/index.js"
+    },
+    "./Dialog": {
+      "types": "./dist/Dialog/index.d.ts",
+      "import": "./dist/Dialog/index.js",
+      "require": "./dist/Dialog/index.js",
+      "default": "./dist/Dialog/index.js"
+    },
+    "./Toast": {
+      "types": "./dist/Toast/index.d.ts",
+      "import": "./dist/Toast/index.js",
+      "require": "./dist/Toast/index.js",
+      "default": "./dist/Toast/index.js"
+    },
+    "./Label": {
+      "types": "./dist/Label/index.d.ts",
+      "import": "./dist/Label/index.js",
+      "require": "./dist/Label/index.js",
+      "default": "./dist/Label/index.js"
+    },
+    "./Card": {
+      "types": "./dist/Card/index.d.ts",
+      "import": "./dist/Card/index.js",
+      "require": "./dist/Card/index.js",
+      "default": "./dist/Card/index.js"
+    },
+    "./DropdownMenu": {
+      "types": "./dist/DropdownMenu/index.d.ts",
+      "import": "./dist/DropdownMenu/index.js",
+      "require": "./dist/DropdownMenu/index.js",
+      "default": "./dist/DropdownMenu/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/react-dropdown-menu": "^2.1.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.5",
+    "lucide-react": "^0.469.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.7.2"
+  }
+}

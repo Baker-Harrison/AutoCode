@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SettingsCategory, keyboardShortcuts } from '@/types/settings';
+import { SettingsCategory, keyboardShortcuts } from '@autocode/types';
 import { GeneralSettings } from './GeneralSettings';
 import { EditorSettings } from './EditorSettings';
 import { TerminalSettings } from './TerminalSettings';

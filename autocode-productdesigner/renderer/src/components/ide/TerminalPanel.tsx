@@ -70,14 +70,30 @@ export const TerminalPanel = () => {
   const [terminals, setTerminals] = useState<TerminalTab[]>([]);
   const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
   const [availableShells, setAvailableShells] = useState<ShellOption[]>(SHELL_OPTIONS);
-  const getDefaultShell = () => {
-    if (isWin) {
-      return "powershell.exe";
-    } else {
-      return "/bin/zsh";
-    }
-  };
-  const [selectedShell, setSelectedShell] = useState<string>(getDefaultShell());
+  const defaultShell = isWin ? "powershell.exe" : "/bin/zsh";
+  const [selectedShell, setSelectedShell] = useState<string>(defaultShell);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchShells = async () => {
+      try {
+        const shells = await window.ide.getAvailableShells();
+        if (isMounted && shells?.length) {
+          setAvailableShells(shells);
+          setSelectedShell((prev) => (shells.some((shell) => shell.path === prev) ? prev : shells[0].path));
+        }
+      } catch (error) {
+        console.error("Failed to load available shells", error);
+      }
+    };
+
+    fetchShells();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   const [isDarkTheme, setIsDarkTheme] = useState<boolean>(true);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);

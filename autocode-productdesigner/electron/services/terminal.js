@@ -44,30 +44,22 @@ function createTerminalManager() {
 
   function resolveShellPath(shellPath) {
     const platform = os.platform();
-    const candidates = [];
+    const shells = getAvailableShells();
+    const allowedShells = new Set(shells.map((shell) => shell.path));
 
-    if (typeof shellPath === "string" && shellPath.trim()) {
-      candidates.push(shellPath.trim());
+    const candidate = typeof shellPath === "string" ? shellPath.trim() : "";
+    if (candidate && allowedShells.has(candidate)) {
+      return candidate;
     }
 
-    if (platform === "win32") {
-      candidates.push("powershell.exe", "cmd.exe");
-    } else {
-      candidates.push("/bin/zsh", "/bin/bash", "/bin/sh");
+    const fallback = platform === "win32" ? "powershell.exe" : "/bin/zsh";
+    if (allowedShells.has(fallback)) {
+      return fallback;
     }
 
-    for (const candidate of candidates) {
-      if (!candidate) continue;
-      if (platform === "win32" && !candidate.includes("/")) {
-        return candidate;
-      }
-      if (path.isAbsolute(candidate) && fs.existsSync(candidate)) {
-        return candidate;
-      }
-    }
-
-    return platform === "win32" ? "powershell.exe" : "/bin/zsh";
+    return shells[0]?.path || fallback;
   }
+
 
   function validateCwd(cwd) {
     if (!cwd || typeof cwd !== "string") {
@@ -255,7 +247,8 @@ function createTerminalManager() {
     }
     const termData = terminals.get(terminalId);
     if (termData && termData.process && !termData.process.killed) {
-      const chunk = data.length > MAX_INPUT_SIZE ? data.slice(0, MAX_INPUT_SIZE) : data;
+      const normalized = data.replace(/\x00/g, "");
+      const chunk = normalized.length > MAX_INPUT_SIZE ? normalized.slice(0, MAX_INPUT_SIZE) : normalized;
       try {
         if (termData.usePty) {
           termData.process.write(chunk);
@@ -269,6 +262,7 @@ function createTerminalManager() {
       }
     }
   }
+
 
   function resize(terminalId, cols, rows) {
     const termData = terminals.get(terminalId);

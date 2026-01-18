@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, defaultSettings } from '@/types/settings';
+import { Settings, defaultSettings } from '@autocode/types';
 
 const SETTINGS_KEY = 'settings';
 
