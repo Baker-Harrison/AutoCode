@@ -2,10 +2,13 @@ const initSqlJs = require("sql.js");
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
+const { runMigrations, getMigrationStatus, backupDatabase } = require("./migration");
+const { createApprovalSystem } = require("./approvalSystem");
 
 let db = null;
 let dbPath = null;
 let SQL = null;
+let approvalSystem = null;
 
 function closeDatabase() {
   if (db) {
@@ -106,6 +109,49 @@ async function initDatabase(workspacePath) {
       created_at TEXT NOT NULL
     );
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS memory (
+      id TEXT PRIMARY KEY,
+      text TEXT NOT NULL,
+      metadata TEXT,
+      area TEXT NOT NULL DEFAULT 'MAIN',
+      created_at TEXT NOT NULL,
+      terms TEXT
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS knowledge_checksums (
+      filepath TEXT PRIMARY KEY,
+      checksum TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  const migrationsApplied = runMigrations(db);
+  if (migrationsApplied > 0) {
+    console.log(`Applied ${migrationsApplied} database migrations`);
+  }
+
+  approvalSystem = createApprovalSystem(db);
+}
+
+function getApprovalSystem() {
+  if (!approvalSystem) {
+    throw new Error("Approval system not initialized. Select workspace first.");
+  }
+  return approvalSystem;
+}
+
+function getMigrationInfo() {
+  const database = getDb();
+  return getMigrationStatus(database);
+}
+
+function backupCurrentDatabase(workspacePath) {
+  const database = getDb();
+  return backupDatabase(database, workspacePath);
 }
 
 function getDb() {
@@ -127,5 +173,8 @@ module.exports = {
   initDatabase,
   closeDatabase,
   getDb,
-  insertEvent
+  insertEvent,
+  getApprovalSystem,
+  getMigrationInfo,
+  backupCurrentDatabase
 };

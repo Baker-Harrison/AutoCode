@@ -1,12 +1,18 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const path = require("path");
 const { randomUUID } = require("crypto");
-const { initDatabase, closeDatabase, getDb, insertEvent } = require("./services/db");
+const { initDatabase, closeDatabase, getDb, insertEvent, getApprovalSystem } = require("./services/db");
 const { generatePlanning } = require("./services/planning");
 const { listDir, readFile, writeFile, createFile, createDir, deletePath, renamePath, pathExists } = require("./services/fileSystem");
 const { createTerminalManager } = require("./services/terminal");
 const { searchWorkspace } = require("./services/search");
 const { createGitService } = require("./services/git");
+const { getMemoryInstance, clearMemoryInstance, MEMORY_AREAS } = require("./services/memory");
+const { buildPrompt, getPromptFiles, readPromptFile, writePromptFile, createProjectDirectory } = require("./services/promptSystem");
+const { workflowEngine } = require("./services/workflow");
+const { eventLogger } = require("./services/eventLogger");
+const { createPluginSystem, getPluginSystem } = require("./services/pluginSystem");
+const { registerWorkflowHandlers, registerEventHandlers } = require("./services/workflowHandlers");
 
 let mainWindow;
 let workspacePath = null;
@@ -81,10 +87,20 @@ async function selectWorkspace() {
     return null;
   }
 
+  const oldWorkspacePath = workspacePath;
   workspacePath = result.filePaths[0];
+
+  if (oldWorkspacePath) {
+    clearMemoryInstance(oldWorkspacePath);
+  }
+
   terminalManager.disposeAll();
   await initDatabase(workspacePath);
   insertEvent(null, "info", `Workspace selected: ${workspacePath}`);
+
+  const pluginSystem = createPluginSystem();
+  pluginSystem.setWorkspace(workspacePath);
+
   return workspacePath;
 }
 
@@ -721,6 +737,575 @@ ipcMain.handle(
   })
 );
 
+ipcMain.handle(
+  "memory:search",
+  withErrorHandling(async (_event, payload) => {
+    const activeWorkspace = ensureWorkspace();
+    const db = getDb();
+    const memory = getMemoryInstance(activeWorkspace, db);
+    return memory.search(
+      payload.query,
+      payload.limit || 10,
+      payload.threshold || 0.1,
+      { area: payload.area }
+    );
+  })
+);
+
+ipcMain.handle(
+  "memory:insert",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || !Array.isArray(payload.texts)) {
+      throw new Error("Invalid memory insert payload");
+    }
+    const activeWorkspace = ensureWorkspace();
+    const db = getDb();
+    const memory = getMemoryInstance(activeWorkspace, db);
+    return { ids: memory.insert(payload.texts, payload.metadata || {}) };
+  })
+);
+
+ipcMain.handle(
+  "memory:delete",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || !payload.ids) {
+      throw new Error("Invalid memory delete payload");
+    }
+    const activeWorkspace = ensureWorkspace();
+    const db = getDb();
+    const memory = getMemoryInstance(activeWorkspace, db);
+    memory.delete(payload.ids);
+    return { ok: true };
+  })
+);
+
+ipcMain.handle(
+  "memory:deleteByQuery",
+  withErrorHandling(async (_event, payload) => {
+    const activeWorkspace = ensureWorkspace();
+    const db = getDb();
+    const memory = getMemoryInstance(activeWorkspace, db);
+    memory.deleteByQuery(payload.query, payload.area);
+    return { ok: true };
+  })
+);
+
+ipcMain.handle(
+  "memory:preload",
+  withErrorHandling(async () => {
+    const activeWorkspace = ensureWorkspace();
+    const db = getDb();
+    const memory = getMemoryInstance(activeWorkspace, db);
+    return memory.preloadKnowledge();
+  })
+);
+
+ipcMain.handle(
+  "memory:list",
+  withErrorHandling(async (_event, area) => {
+    const activeWorkspace = ensureWorkspace();
+    const db = getDb();
+    const memory = getMemoryInstance(activeWorkspace, db);
+    return memory.getAllMemories(area);
+  })
+);
+
+ipcMain.handle(
+  "memory:getById",
+  withErrorHandling(async (_event, id) => {
+    const activeWorkspace = ensureWorkspace();
+    const db = getDb();
+    const memory = getMemoryInstance(activeWorkspace, db);
+    return memory.getMemoryById(id);
+  })
+);
+
+ipcMain.handle(
+  "memory:stats",
+  withErrorHandling(async () => {
+    const activeWorkspace = ensureWorkspace();
+    const db = getDb();
+    const memory = getMemoryInstance(activeWorkspace, db);
+    return memory.getKnowledgeStats();
+  })
+);
+
+ipcMain.handle(
+  "memory:areas",
+  () => MEMORY_AREAS
+);
+
+ipcMain.handle(
+  "team:list",
+  withErrorHandling(async () => {
+    return gitService.listTeams(ensureWorkspace());
+  })
+);
+
+ipcMain.handle(
+  "team:create",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.name !== "string") {
+      throw new Error("Invalid team create payload");
+    }
+    return gitService.createTeam(ensureWorkspace(), payload.name);
+  })
+);
+
+ipcMain.handle(
+  "team:list-branches",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.teamName !== "string") {
+      throw new Error("Invalid team list branches payload");
+    }
+    return gitService.listTeamBranches(ensureWorkspace(), payload.teamName);
+  })
+);
+
+ipcMain.handle(
+  "team:create-branch",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.teamName !== "string" || typeof payload.subBranchName !== "string") {
+      throw new Error("Invalid team create branch payload");
+    }
+    return gitService.createTeamBranch(ensureWorkspace(), payload.teamName, payload.subBranchName);
+  })
+);
+
+ipcMain.handle(
+  "team:create-pr",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.teamName !== "string" || typeof payload.fromBranch !== "string" || typeof payload.title !== "string") {
+      throw new Error("Invalid team create PR payload");
+    }
+    return gitService.createTeamPR(ensureWorkspace(), payload.teamName, payload.fromBranch, payload.title, payload.description || "");
+  })
+);
+
+ipcMain.handle(
+  "team:merge-pr",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.teamName !== "string" || typeof payload.prId !== "string" || typeof payload.approved !== "boolean") {
+      throw new Error("Invalid team merge PR payload");
+    }
+    return gitService.mergeTeamPR(ensureWorkspace(), payload.teamName, payload.prId, payload.approved);
+  })
+);
+
+ipcMain.handle(
+  "team:list-commits",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.teamName !== "string") {
+      throw new Error("Invalid team list commits payload");
+    }
+    return gitService.listTeamCommits(ensureWorkspace(), payload.teamName);
+  })
+);
+
+ipcMain.handle(
+  "team:list-prs",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.teamName !== "string") {
+      throw new Error("Invalid team list PRs payload");
+    }
+    return gitService.listTeamPRs(ensureWorkspace(), payload.teamName);
+  })
+);
+
+ipcMain.handle(
+  "prompt:build",
+  withErrorHandling(async (_event, options) => {
+    return buildPrompt(ensureWorkspace(), options);
+  })
+);
+
+ipcMain.handle(
+  "prompt:list",
+  withErrorHandling(async () => {
+    return getPromptFiles(ensureWorkspace());
+  })
+);
+
+ipcMain.handle(
+  "prompt:read",
+  withErrorHandling(async (_event, filePath) => {
+    if (typeof filePath !== "string") {
+      throw new Error("Invalid file path");
+    }
+    return readPromptFile(ensureWorkspace(), filePath);
+  })
+);
+
+ipcMain.handle(
+  "prompt:write",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.path !== "string" || typeof payload.content !== "string") {
+      throw new Error("Invalid write payload");
+    }
+    return writePromptFile(ensureWorkspace(), payload.path, payload.content);
+  })
+);
+
+ipcMain.handle(
+  "prompt:createProject",
+  withErrorHandling(async (_event, name) => {
+    if (typeof name !== "string") {
+      throw new Error("Invalid project name");
+    }
+    return createProjectDirectory(ensureWorkspace(), name);
+  })
+);
+
+ipcMain.handle(
+  "approval:assessRisk",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.actionType !== "string") {
+      throw new Error("Invalid risk assessment payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.assessRisk(payload.actionType, payload.actionData);
+  })
+);
+
+ipcMain.handle(
+  "approval:create",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.actionType !== "string" || typeof payload.actionId !== "string") {
+      throw new Error("Invalid approval create payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.createApproval(
+      payload.actionId,
+      payload.actionType,
+      payload.actionDescription || "",
+      payload.riskLevel,
+      payload.diffPreview || "",
+      payload.agentRationale || "",
+      payload.bundleId || null
+    );
+  })
+);
+
+ipcMain.handle(
+  "approval:approve",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.approvalId !== "string" || typeof payload.approver !== "string") {
+      throw new Error("Invalid approval payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.approveRequest(
+      payload.approvalId,
+      payload.approver,
+      payload.approverRole,
+      payload.comments || ""
+    );
+  })
+);
+
+ipcMain.handle(
+  "approval:reject",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.approvalId !== "string" || typeof payload.approver !== "string") {
+      throw new Error("Invalid rejection payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.rejectRequest(
+      payload.approvalId,
+      payload.approver,
+      payload.approverRole,
+      payload.comments || ""
+    );
+  })
+);
+
+ipcMain.handle(
+  "approval:escalate",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.approvalId !== "string" || typeof payload.escalatedTo !== "string") {
+      throw new Error("Invalid escalation payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.escalateRequest(
+      payload.approvalId,
+      payload.escalatedTo,
+      payload.reason || "",
+      payload.escalatedBy
+    );
+  })
+);
+
+ipcMain.handle(
+  "approval:getPending",
+  withErrorHandling(async (_event, limit) => {
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.getPendingApprovals(limit || 50);
+  })
+);
+
+ipcMain.handle(
+  "approval:getHistory",
+  withErrorHandling(async (_event, filters) => {
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.getApprovalHistory(filters || {});
+  })
+);
+
+ipcMain.handle(
+  "approval:getEscalations",
+  withErrorHandling(async (_event, filters) => {
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.getEscalations(filters || {});
+  })
+);
+
+ipcMain.handle(
+  "approval:resolveEscalation",
+  withErrorHandling(async (_event, escalationId) => {
+    if (typeof escalationId !== "string") {
+      throw new Error("Invalid escalation ID");
+    }
+    const approvalSystem = getApprovalSystem();
+    approvalSystem.resolveEscalation(escalationId);
+    return { ok: true };
+  })
+);
+
+ipcMain.handle(
+  "approval:getRules",
+  withErrorHandling(async () => {
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.getRules();
+  })
+);
+
+ipcMain.handle(
+  "approval:createRule",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.ruleName !== "string" || typeof payload.actionType !== "string") {
+      throw new Error("Invalid rule create payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.createRule(
+      payload.ruleName,
+      payload.actionType,
+      payload.riskLevel,
+      payload.autoApprove,
+      payload.pattern || null
+    );
+  })
+);
+
+ipcMain.handle(
+  "approval:updateRule",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.ruleId !== "string") {
+      throw new Error("Invalid rule update payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    approvalSystem.updateRule(payload.ruleId, {
+      ruleName: payload.ruleName,
+      riskLevel: payload.riskLevel,
+      autoApprove: payload.autoApprove,
+      pattern: payload.pattern
+    });
+    return { ok: true };
+  })
+);
+
+ipcMain.handle(
+  "approval:deleteRule",
+  withErrorHandling(async (_event, ruleId) => {
+    if (typeof ruleId !== "string") {
+      throw new Error("Invalid rule ID");
+    }
+    const approvalSystem = getApprovalSystem();
+    approvalSystem.deleteRule(ruleId);
+    return { ok: true };
+  })
+);
+
+ipcMain.handle(
+  "approval:getBundle",
+  withErrorHandling(async (_event, bundleId) => {
+    if (typeof bundleId !== "string") {
+      throw new Error("Invalid bundle ID");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.getBundleApprovals(bundleId);
+  })
+);
+
+ipcMain.handle(
+  "approval:bulkApprove",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.bundleId !== "string" || typeof payload.approver !== "string") {
+      throw new Error("Invalid bulk approve payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.bulkApprove(
+      payload.bundleId,
+      payload.approver,
+      payload.approverRole,
+      payload.comments || "",
+      payload.vetoIds || []
+    );
+  })
+);
+
+ipcMain.handle(
+  "approval:bulkReject",
+  withErrorHandling(async (_event, payload) => {
+    if (!payload || typeof payload.bundleId !== "string" || typeof payload.approver !== "string") {
+      throw new Error("Invalid bulk reject payload");
+    }
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.bulkReject(
+      payload.bundleId,
+      payload.approver,
+      payload.approverRole,
+      payload.comments || ""
+    );
+  })
+);
+
+ipcMain.handle(
+  "approval:getRiskLevels",
+  withErrorHandling(async () => {
+    const approvalSystem = getApprovalSystem();
+    return approvalSystem.getRiskLevels();
+  })
+);
+
+ipcMain.handle(
+  "plugin:list",
+  withErrorHandling(async () => {
+    const pluginSystem = getPluginSystem();
+    const plugins = pluginSystem.getAllPlugins();
+    return plugins.map(p => ({
+      id: p.id,
+      name: p.name,
+      version: p.version,
+      description: p.description,
+      enabled: p.enabled,
+      scope: p.path.includes(pluginSystem.basePluginDir) ? "user" : "workspace"
+    }));
+  })
+);
+
+ipcMain.handle(
+  "plugin:get",
+  withErrorHandling(async (_event, pluginId) => {
+    if (!pluginId || typeof pluginId !== "string") {
+      throw new Error("Invalid plugin ID");
+    }
+    const pluginSystem = getPluginSystem();
+    const plugin = pluginSystem.getPlugin(pluginId);
+    if (!plugin) {
+      throw new Error("Plugin not found");
+    }
+    return {
+      id: plugin.id,
+      name: plugin.name,
+      version: plugin.version,
+      description: plugin.description,
+      enabled: plugin.enabled,
+      manifest: plugin.manifest
+    };
+  })
+);
+
+ipcMain.handle(
+  "plugin:activate",
+  withErrorHandling(async (_event, pluginId) => {
+    if (!pluginId || typeof pluginId !== "string") {
+      throw new Error("Invalid plugin ID");
+    }
+    const pluginSystem = getPluginSystem();
+    await pluginSystem.activatePlugin(pluginId);
+    return { success: true, pluginId };
+  })
+);
+
+ipcMain.handle(
+  "plugin:deactivate",
+  withErrorHandling(async (_event, pluginId) => {
+    if (!pluginId || typeof pluginId !== "string") {
+      throw new Error("Invalid plugin ID");
+    }
+    const pluginSystem = getPluginSystem();
+    await pluginSystem.deactivatePlugin(pluginId);
+    return { success: true, pluginId };
+  })
+);
+
+ipcMain.handle(
+  "plugin:install",
+  withErrorHandling(async (_event, manifestUrl) => {
+    if (!manifestUrl || typeof manifestUrl !== "string") {
+      throw new Error("Invalid manifest URL");
+    }
+    const pluginSystem = getPluginSystem();
+    return await pluginSystem.installPlugin(manifestUrl);
+  })
+);
+
+ipcMain.handle(
+  "plugin:uninstall",
+  withErrorHandling(async (_event, pluginId) => {
+    if (!pluginId || typeof pluginId !== "string") {
+      throw new Error("Invalid plugin ID");
+    }
+    const pluginSystem = getPluginSystem();
+    return await pluginSystem.uninstallPlugin(pluginId);
+  })
+);
+
+ipcMain.handle(
+  "plugin:update",
+  withErrorHandling(async (_event, pluginId) => {
+    if (!pluginId || typeof pluginId !== "string") {
+      throw new Error("Invalid plugin ID");
+    }
+    const pluginSystem = getPluginSystem();
+    return await pluginSystem.updatePlugin(pluginId);
+  })
+);
+
+ipcMain.handle(
+  "plugin:get-hooks",
+  withErrorHandling(async () => {
+    const pluginSystem = getPluginSystem();
+    return pluginSystem.getHookList();
+  })
+);
+
+ipcMain.handle(
+  "plugin:get-tools",
+  withErrorHandling(async () => {
+    const pluginSystem = getPluginSystem();
+    return pluginSystem.getAllTools();
+  })
+);
+
+ipcMain.handle(
+  "plugin:get-instruments",
+  withErrorHandling(async () => {
+    const pluginSystem = getPluginSystem();
+    return pluginSystem.getAllInstruments();
+  })
+);
+
+ipcMain.handle(
+  "plugin:get-active",
+  withErrorHandling(async () => {
+    const pluginSystem = getPluginSystem();
+    return pluginSystem.getActivePlugins();
+  })
+);
+
+registerWorkflowHandlers(ipcMain);
+registerEventHandlers(ipcMain);
+
 app.whenReady().then(() => {
   createWindow();
 
@@ -733,6 +1318,9 @@ app.whenReady().then(() => {
 
 app.on("before-quit", () => {
   terminalManager.disposeAll();
+  if (workspacePath) {
+    clearMemoryInstance(workspacePath);
+  }
   closeDatabase();
 });
 

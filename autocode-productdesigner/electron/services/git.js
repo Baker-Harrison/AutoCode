@@ -337,6 +337,279 @@ function createGitService() {
     return git.show([`${commitHash}:${filePath}`]);
   }
 
+  function getTeamsConfigPath(workspacePath) {
+    return require("path").join(workspacePath, ".workspace", "teams.json");
+  }
+
+  async function loadTeams(workspacePath) {
+    const fs = require("fs").promises;
+    const path = require("path");
+    const configPath = getTeamsConfigPath(workspacePath);
+
+    try {
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      const data = await fs.readFile(configPath, "utf8");
+      return JSON.parse(data);
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return { teams: [] };
+      }
+      throw error;
+    }
+  }
+
+  async function saveTeams(workspacePath, teamsData) {
+    const fs = require("fs").promises;
+    const configPath = getTeamsConfigPath(workspacePath);
+    await fs.writeFile(configPath, JSON.stringify(teamsData, null, 2), "utf8");
+  }
+
+  async function listTeams(workspacePath) {
+    const teamsData = await loadTeams(workspacePath);
+    return teamsData.teams;
+  }
+
+  async function createTeam(workspacePath, name) {
+    if (!name || typeof name !== "string") {
+      throw new Error("Team name is required");
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+      throw new Error("Team name can only contain letters, numbers, hyphens, and underscores");
+    }
+
+    const teamsData = await loadTeams(workspacePath);
+    const existingTeam = teamsData.teams.find(t => t.name === name);
+    if (existingTeam) {
+      throw new Error(`Team '${name}' already exists`);
+    }
+
+    const leaderBranch = `team-${name}`;
+    const team = {
+      name,
+      leaderBranch,
+      subBranches: [],
+      createdAt: new Date().toISOString()
+    };
+
+    teamsData.teams.push(team);
+    await saveTeams(workspacePath, teamsData);
+
+    const git = await getRepo(workspacePath);
+    const currentBranch = await git.revparse(["--abbrev-ref", "HEAD"]);
+    await git.checkoutLocalBranch(leaderBranch);
+
+    return team;
+  }
+
+  async function listTeamBranches(workspacePath, teamName) {
+    const teamsData = await loadTeams(workspacePath);
+    const team = teamsData.teams.find(t => t.name === teamName);
+    if (!team) {
+      throw new Error(`Team '${teamName}' not found`);
+    }
+
+    const git = await getRepo(workspacePath);
+    const allBranches = await git.branch();
+
+    const teamBranches = [team.leaderBranch];
+    teamBranches.push(...team.subBranches.map(sb => `${team.leaderBranch}/${sb}`));
+
+    const branches = allBranches.all.filter(b => teamBranches.includes(b));
+    const currentBranch = await git.revparse(["--abbrev-ref", "HEAD"]);
+
+    return branches.map(name => ({
+      name,
+      current: name === currentBranch,
+      isLeader: name === team.leaderBranch,
+      subBranchName: name !== team.leaderBranch ? name.substring(team.leaderBranch.length + 1) : null
+    }));
+  }
+
+  async function createTeamBranch(workspacePath, teamName, subBranchName) {
+    if (!teamName || typeof teamName !== "string") {
+      throw new Error("Team name is required");
+    }
+    if (!subBranchName || typeof subBranchName !== "string") {
+      throw new Error("Sub-branch name is required");
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(subBranchName)) {
+      throw new Error("Sub-branch name can only contain letters, numbers, hyphens, and underscores");
+    }
+
+    const teamsData = await loadTeams(workspacePath);
+    const team = teamsData.teams.find(t => t.name === teamName);
+    if (!team) {
+      throw new Error(`Team '${teamName}' not found`);
+    }
+
+    if (team.subBranches.includes(subBranchName)) {
+      throw new Error(`Sub-branch '${subBranchName}' already exists in team '${teamName}'`);
+    }
+
+    const fullBranchName = `${team.leaderBranch}/${subBranchName}`;
+
+    const git = await getRepo(workspacePath);
+    const currentBranch = await git.revparse(["--abbrev-ref", "HEAD"]);
+
+    await git.checkout(team.leaderBranch);
+    await git.checkoutLocalBranch(fullBranchName);
+
+    team.subBranches.push(subBranchName);
+    await saveTeams(workspacePath, teamsData);
+
+    return { name: fullBranchName, subBranchName };
+  }
+
+  async function createTeamPR(workspacePath, teamName, fromBranch, title, description) {
+    const teamsData = await loadTeams(workspacePath);
+    const team = teamsData.teams.find(t => t.name === teamName);
+    if (!team) {
+      throw new Error(`Team '${teamName}' not found`);
+    }
+
+    const git = await getRepo(workspacePath);
+    const remotes = await git.remote(["get-url", "origin"]).catch(() => null);
+
+    if (!remotes) {
+      throw new Error("No remote repository configured. Please add a remote to create PRs.");
+    }
+
+    const { execSync } = require("child_process");
+
+    try {
+      const owner = require("path").basename(workspacePath);
+      const repoName = require("path").basename(workspacePath);
+      const remoteUrl = remotes.trim();
+
+      const titleEscaped = title.replace(/"/g, '\\"');
+      const descEscaped = description ? description.replace(/"/g, '\\"') : "";
+
+      const cmd = `gh pr create --base "${team.leaderBranch}" --head "${fromBranch}" --title "${titleEscaped}" ${descEscaped ? `--body "${descEscaped}"` : ""}`;
+      const result = execSync(cmd, { cwd: workspacePath, encoding: "utf8" });
+
+      const prUrlMatch = result.match(/https:\/\/github\.com\/[^\/]+\/[^\/]+\/pull\/\d+/);
+      if (!prUrlMatch) {
+        throw new Error("Failed to create PR or extract PR URL");
+      }
+
+      const prUrl = prUrlMatch[0];
+      const prId = prUrl.split("/").pop();
+
+      return {
+        id: prId,
+        url: prUrl,
+        title,
+        fromBranch,
+        toBranch: team.leaderBranch
+      };
+    } catch (error) {
+      throw new Error(`Failed to create PR: ${error.message}`);
+    }
+  }
+
+  async function mergeTeamPR(workspacePath, teamName, prId, approved) {
+    if (!approved) {
+      throw new Error("PR must be approved before merging");
+    }
+
+    const teamsData = await loadTeams(workspacePath);
+    const team = teamsData.teams.find(t => t.name === teamName);
+    if (!team) {
+      throw new Error(`Team '${teamName}' not found`);
+    }
+
+    const { execSync } = require("child_process");
+
+    try {
+      execSync(`gh pr merge ${prId} --merge --delete-branch`, { cwd: workspacePath, encoding: "utf8" });
+      return { success: true, prId };
+    } catch (error) {
+      throw new Error(`Failed to merge PR: ${error.message}`);
+    }
+  }
+
+  async function listTeamCommits(workspacePath, teamName) {
+    const teamsData = await loadTeams(workspacePath);
+    const team = teamsData.teams.find(t => t.name === teamName);
+    if (!team) {
+      throw new Error(`Team '${teamName}' not found`);
+    }
+
+    const git = await getRepo(workspacePath);
+    const allBranches = await git.branch();
+
+    const teamBranches = [team.leaderBranch];
+    teamBranches.push(...team.subBranches.map(sb => `${team.leaderBranch}/${sb}`));
+
+    const existingTeamBranches = teamBranches.filter(b => allBranches.all.includes(b));
+
+    let allCommits = [];
+    for (const branch of existingTeamBranches) {
+      try {
+        const branchCommits = await git.log({ maxCount: 50, from: branch });
+        allCommits = allCommits.concat(
+          branchCommits.all.map(entry => ({
+            hash: entry.hash,
+            shortHash: entry.hash.substring(0, 7),
+            message: entry.message,
+            author: entry.author_name,
+            date: entry.date,
+            body: entry.body || "",
+            branch
+          }))
+        );
+      } catch (error) {
+        console.warn(`Failed to get commits for branch ${branch}:`, error.message);
+      }
+    }
+
+    allCommits.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const uniqueCommits = [];
+    const seenHashes = new Set();
+    for (const commit of allCommits) {
+      if (!seenHashes.has(commit.hash)) {
+        seenHashes.add(commit.hash);
+        uniqueCommits.push(commit);
+      }
+    }
+
+    return uniqueCommits;
+  }
+
+  async function listTeamPRs(workspacePath, teamName) {
+    const teamsData = await loadTeams(workspacePath);
+    const team = teamsData.teams.find(t => t.name === teamName);
+    if (!team) {
+      throw new Error(`Team '${teamName}' not found`);
+    }
+
+    const { execSync } = require("child_process");
+
+    try {
+      const result = execSync(`gh pr list --base "${team.leaderBranch}" --json number,title,state,headRefName,url,createdAt,author`, { cwd: workspacePath, encoding: "utf8" });
+      const prs = JSON.parse(result);
+
+      return prs.map(pr => ({
+        id: String(pr.number),
+        title: pr.title,
+        state: pr.state,
+        fromBranch: pr.headRefName,
+        toBranch: team.leaderBranch,
+        url: pr.url,
+        createdAt: pr.createdAt,
+        author: pr.author?.login || "unknown"
+      }));
+    } catch (error) {
+      if (error.message.includes("no open pull requests")) {
+        return [];
+      }
+      throw new Error(`Failed to list PRs: ${error.message}`);
+    }
+  }
+
   return {
     getGitStatus,
     stageFile,
@@ -370,7 +643,15 @@ function createGitService() {
     getLastCommitMessage,
     getCommitDetails,
     diffBranches,
-    getFileContentAtCommit
+    getFileContentAtCommit,
+    listTeams,
+    createTeam,
+    listTeamBranches,
+    createTeamBranch,
+    createTeamPR,
+    mergeTeamPR,
+    listTeamCommits,
+    listTeamPRs
   };
 }
 
