@@ -17,8 +17,7 @@ interface OutputPanelProps {
 const SOURCE_TYPES = [
   { id: "build", name: "Build", icon: "🔨" },
   { id: "test", name: "Test", icon: "🧪" },
-  { id: "lint", name: "Lint", icon: "🔍" },
-  { id: "custom", name: "Custom", icon: "⚡" }
+  { id: "lint", name: "Lint", icon: "🔍" }
 ];
 
 export const OutputPanel = ({ defaultSource = "build" }: OutputPanelProps) => {
@@ -85,8 +84,6 @@ export const OutputPanel = ({ defaultSource = "build" }: OutputPanelProps) => {
       addOutput("Running npm run build...", "info", "build");
 
       const result = await window.ide.runCommand({
-        command: "npm run build",
-        cwd: workspace,
         source: "build"
       });
 
@@ -120,8 +117,6 @@ export const OutputPanel = ({ defaultSource = "build" }: OutputPanelProps) => {
       addOutput("Running npm test...", "info", "test");
 
       const result = await window.ide.runCommand({
-        command: "npm test",
-        cwd: workspace,
         source: "test"
       });
 
@@ -155,8 +150,6 @@ export const OutputPanel = ({ defaultSource = "build" }: OutputPanelProps) => {
       addOutput("Running npm run lint...", "info", "lint");
 
       const result = await window.ide.runCommand({
-        command: "npm run lint",
-        cwd: workspace,
         source: "lint"
       });
 

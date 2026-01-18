@@ -16,7 +16,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "renderer/src")
+      "@": path.resolve(__dirname, "renderer/src"),
+      "xterm/css/xterm.css": path.resolve(__dirname, "node_modules/xterm/css/xterm.css")
     }
   }
 });

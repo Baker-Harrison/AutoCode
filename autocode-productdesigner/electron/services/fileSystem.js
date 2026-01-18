@@ -1,11 +1,35 @@
 const fs = require("fs");
 const path = require("path");
 
+function isInsideRoot(root, target) {
+  const relative = path.relative(root, target);
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
 function resolveSafePath(workspacePath, targetPath) {
-  const resolved = path.resolve(workspacePath, targetPath || ".");
-  if (!resolved.startsWith(workspacePath)) {
+  const root = fs.realpathSync(workspacePath);
+  const resolved = path.resolve(root, targetPath || ".");
+
+  let anchorPath = resolved;
+  while (!fs.existsSync(anchorPath)) {
+    const parent = path.dirname(anchorPath);
+    if (parent === anchorPath) {
+      break;
+    }
+    anchorPath = parent;
+  }
+
+  let realAnchor;
+  try {
+    realAnchor = fs.realpathSync(anchorPath);
+  } catch (error) {
     throw new Error("Invalid path outside workspace");
   }
+
+  if (!isInsideRoot(root, realAnchor)) {
+    throw new Error("Invalid path outside workspace");
+  }
+
   return resolved;
 }
 
@@ -32,7 +56,10 @@ function readFile(workspacePath, targetPath) {
     throw new Error("Workspace not selected");
   }
   const resolved = resolveSafePath(workspacePath, targetPath);
-  const stat = fs.statSync(resolved);
+  const stat = fs.statSync(resolved, { throwIfNoEntry: false });
+  if (!stat || !stat.isFile()) {
+    throw new Error("File not found");
+  }
   if (stat.size > 1024 * 1024) {
     throw new Error("File too large to preview");
   }
@@ -44,7 +71,7 @@ function writeFile(workspacePath, targetPath, content) {
     throw new Error("Workspace not selected");
   }
   const resolved = resolveSafePath(workspacePath, targetPath);
-  fs.writeFileSync(resolved, content, "utf-8");
+  fs.writeFileSync(resolved, content, { encoding: "utf-8", flag: "w" });
 }
 
 function createFile(workspacePath, relativePath, content = "") {
@@ -52,7 +79,7 @@ function createFile(workspacePath, relativePath, content = "") {
     throw new Error("Workspace not selected");
   }
   const resolved = resolveSafePath(workspacePath, relativePath);
-  fs.writeFileSync(resolved, content, "utf-8");
+  fs.writeFileSync(resolved, content, { encoding: "utf-8", flag: "wx" });
   const absolutePath = path.resolve(resolved);
   return {
     ok: true,
@@ -65,6 +92,9 @@ function createDir(workspacePath, relativePath) {
     throw new Error("Workspace not selected");
   }
   const resolved = resolveSafePath(workspacePath, relativePath);
+  if (fs.existsSync(resolved)) {
+    throw new Error("Directory already exists");
+  }
   fs.mkdirSync(resolved, { recursive: true });
   const absolutePath = path.resolve(resolved);
   return {
@@ -78,7 +108,10 @@ function deletePath(workspacePath, relativePath) {
     throw new Error("Workspace not selected");
   }
   const resolved = resolveSafePath(workspacePath, relativePath);
-  const stat = fs.statSync(resolved);
+  const stat = fs.lstatSync(resolved);
+  if (stat.isSymbolicLink()) {
+    throw new Error("Refusing to delete symlink");
+  }
   if (stat.isDirectory()) {
     const entries = fs.readdirSync(resolved);
     if (entries.length > 0) {
@@ -97,6 +130,13 @@ function renamePath(workspacePath, sourcePath, targetPath) {
   }
   const resolvedSource = resolveSafePath(workspacePath, sourcePath);
   const resolvedTarget = resolveSafePath(workspacePath, targetPath);
+  const sourceStat = fs.lstatSync(resolvedSource);
+  if (sourceStat.isSymbolicLink()) {
+    throw new Error("Refusing to rename symlink");
+  }
+  if (fs.existsSync(resolvedTarget)) {
+    throw new Error("Target already exists");
+  }
   fs.renameSync(resolvedSource, resolvedTarget);
   const absolutePath = path.resolve(resolvedTarget);
   return {
@@ -110,10 +150,10 @@ function pathExists(workspacePath, relativePath) {
     throw new Error("Workspace not selected");
   }
   const resolved = resolveSafePath(workspacePath, relativePath);
-  if (!fs.existsSync(resolved)) {
+  const stat = fs.statSync(resolved, { throwIfNoEntry: false });
+  if (!stat) {
     return { exists: false, isDirectory: false };
   }
-  const stat = fs.statSync(resolved);
   return {
     exists: true,
     isDirectory: stat.isDirectory()

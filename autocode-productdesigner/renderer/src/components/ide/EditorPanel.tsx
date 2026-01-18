@@ -349,17 +349,24 @@ export const EditorPanel = ({
   };
 
   const handleCursorActivity = useCallback((update: any) => {
-    if (update.state) {
-      const state = update.state;
-      const cursor = state.selection.main.head;
-      const line = state.doc.lineAt(cursor);
-      setDocLines(state.doc.lines);
-      setEditorState(prev => ({
+    if (!update.state) return;
+    const state = update.state;
+    const cursor = state.selection.main.head;
+    const line = state.doc.lineAt(cursor);
+
+    setDocLines(prev => (prev === state.doc.lines ? prev : state.doc.lines));
+    setEditorState(prev => {
+      const nextLine = line.number;
+      const nextColumn = cursor - line.from + 1;
+      if (prev.line === nextLine && prev.column === nextColumn) {
+        return prev;
+      }
+      return {
         ...prev,
-        line: line.number,
-        column: cursor - line.from + 1
-      }));
-    }
+        line: nextLine,
+        column: nextColumn
+      };
+    });
   }, []);
 
   const goToLine = useCallback((line: number) => {

@@ -9,8 +9,11 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["renderer/src/*"]
+      "@/*": ["renderer/src/*"],
+      "@autocode/types": ["packages/types/src/index.ts"],
+      "@autocode/types/*": ["packages/types/src/*.ts"],
+      "@autocode/ui/*": ["packages/ui/src/*"]
     }
   },
-  "include": ["renderer/src", "vite.config.ts"]
+  "include": ["renderer/src", "packages/types/src", "packages/ui/src", "vite.config.ts"]
 }
